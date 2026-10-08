@@ -141,20 +141,21 @@ class ServiceOrderService
         });
     }
 
-    /** Hapus Form SA (hanya draft) beserta isi + unit entry yang menjadi yatim. */
+    /** Hapus Form SA (admin/owner) beserta isi + unit entry yang menjadi yatim. */
     public function hapus(ServiceOrder $serviceOrder): void
     {
-        if ($serviceOrder->status !== ServiceOrderStatus::Draft) {
-            throw new AturanBisnisException('Hanya Form SA berstatus Draft yang dapat dihapus.');
+        if ($serviceOrder->status->sudahKeluarStok()) {
+            throw new AturanBisnisException('Form SA yang sudah selesai/dibayar tidak dapat dihapus. Gunakan Batalkan.');
         }
 
         DB::transaction(function () use ($serviceOrder) {
-            $unitEntry = $serviceOrder->unitEntry;
+            $unitEntryId = $serviceOrder->unit_entry_id;
             // services/parts/conditions terhapus otomatis via cascade; unit_entry.service_order_id jadi null.
             $serviceOrder->delete();
 
-            if ($unitEntry && ! $unitEntry->checkup_id) {
-                $unitEntry->delete();
+            // Hapus unit entry yatim (kunjungan hanya milik SA ini, tanpa check up).
+            if ($unitEntryId) {
+                UnitEntry::whereKey($unitEntryId)->whereNull('checkup_id')->delete();
             }
         });
     }

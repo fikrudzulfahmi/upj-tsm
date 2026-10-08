@@ -119,7 +119,7 @@ async function hapus(baris) {
             <BaseButton ukuran="ikon" varian="garis" ikon="pencil" title="Ubah" />
           </RouterLink>
           <BaseButton
-            v-if="auth.isAdmin && baris.status === 'draft'"
+            v-if="auth.isAdmin && !['finished', 'paid'].includes(baris.status)"
             ukuran="ikon"
             varian="bahaya"
             ikon="trash"

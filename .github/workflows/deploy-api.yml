@@ -74,7 +74,27 @@ jobs:
           script: |
             set -e
             PHP_BIN="${PHP_BIN:-php}"
-            echo "PHP: $($PHP_BIN -v 2>/dev/null | head -1 || echo 'TIDAK DITEMUKAN')"
+
+            # --- pilih biner PHP yang memadai (dependensi Excel butuh >= 8.3) ---
+            if [ ! -x "$PHP_BIN" ] && ! command -v "$PHP_BIN" >/dev/null 2>&1; then
+              PHP_BIN="$(command -v php 2>/dev/null || echo php)"
+            fi
+
+            if ! "$PHP_BIN" -r 'exit(PHP_VERSION_ID >= 80300 ? 0 : 1);' 2>/dev/null; then
+              for kandidat in /opt/cpanel/ea-php83/root/usr/bin/php /opt/cpanel/ea-php84/root/usr/bin/php /usr/local/bin/ea-php83; do
+                if [ -x "$kandidat" ] && "$kandidat" -r 'exit(PHP_VERSION_ID >= 80300 ? 0 : 1);' 2>/dev/null; then
+                  echo "::notice::PHP dari PHP_BIN lebih tua dari 8.3 (butuh untuk dependensi Excel) → otomatis memakai $kandidat. JANGAN LUPA: ubah juga PHP subdomain API ke 8.3 di cPanel → MultiPHP Manager."
+                  PHP_BIN="$kandidat"
+                  break
+                fi
+              done
+            fi
+
+            echo "PHP dipakai: $($PHP_BIN -v 2>/dev/null | head -1 || echo 'TIDAK DITEMUKAN')"
+            if ! "$PHP_BIN" -r 'exit(PHP_VERSION_ID >= 80300 ? 0 : 1);' 2>/dev/null; then
+              echo "::error title=PHP TERLALU TUA::Server hanya menyediakan PHP $($PHP_BIN -r 'echo PHP_VERSION;' 2>/dev/null) untuk CLI. Buka cPanel → MultiPHP Manager, pilih PHP 8.3 untuk subdomain API, lalu jalankan ulang."
+              exit 1
+            fi
 
             if [ ! -d "$DEPLOY_PATH_API" ]; then
               echo "::error title=FOLDER DEPLOY TIDAK ADA::$DEPLOY_PATH_API tidak ditemukan. Perbaiki secret DEPLOY_PATH_API."

@@ -30,7 +30,9 @@ yang hanya jalan bila folder terkait berubah.
    git remote add origin git@github.com:USER/NAMA-REPO.git
    git push -u origin main
    ```
-3. **Kunci SSH server → GitHub** supaya server dapat `git pull`:
+3. **Kunci SSH server → GitHub** supaya server dapat `git pull`.
+   > **Repo publik? Langkah ini boleh DILEWATI.** Server bisa `git clone`/`git pull`
+   > tanpa kunci apa pun. Lakukan langkah di bawah hanya bila repo privat.
    1. Di server (SSH): `ssh-keygen -t ed25519 -C "server-bengkel" -f ~/.ssh/github_deploy -N ""`
    2. Salin isi `~/.ssh/github_deploy.pub`
    3. Di repo GitHub: **Settings → Deploy keys → Add deploy key** → tempel kunci itu,

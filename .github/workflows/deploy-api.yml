@@ -91,41 +91,48 @@ jobs:
             fi
 
             if command -v composer >/dev/null 2>&1; then
-              COMPOSER="composer"
+              set -- composer
             elif [ -f "$HOME/composer.phar" ]; then
-              COMPOSER="$PHP_BIN $HOME/composer.phar"
+              set -- "$PHP_BIN" "$HOME/composer.phar"
             else
               echo "::error title=COMPOSER TIDAK DITEMUKAN::Pasang Composer di server (cPanel → MultiPHP/Composer, atau unggah composer.phar ke folder home) lalu jalankan ulang."
               exit 1
             fi
 
+            # Setiap fase melaporkan sendiri bila gagal: pesan ringkas + potongan
+            # keluaran terakhir dilampirkan sebagai annotation (agar tidak perlu log).
+            fase() {
+              label="$1"; shift
+              log=/tmp/fase.deploy.log
+              if "$@" >"$log" 2>&1; then
+                echo "-- $label: OK"
+                tail -3 "$log"
+              else
+                echo "::error title=GAGAL: $label::$(tail -c 400 "$log" | tr '\n' ' ')"
+                exit 1
+              fi
+            }
+
             echo "== dependensi produksi =="
-            $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+            fase "composer install" "$@" install --no-dev --optimize-autoloader --no-interaction
 
             echo "== kunci aplikasi (hanya bila belum ada — tidak pernah menimpa) =="
             if grep -q '^APP_KEY=base64:' .env 2>/dev/null; then
               echo "APP_KEY sudah ada, dilewati."
             else
-              $PHP_BIN artisan key:generate --force
+              fase "key:generate" $PHP_BIN artisan key:generate --force
             fi
 
             echo "== migrasi database =="
-            if ! $PHP_BIN artisan migrate --force; then
-              echo "::error title=MIGRASI GAGAL::Periksa DB_DATABASE / DB_USERNAME / DB_PASSWORD di .env server dan pastikan database sudah dibuat di cPanel → MySQL Databases."
-              exit 1
-            fi
+            fase "migrate --force" $PHP_BIN artisan migrate --force
 
             $PHP_BIN artisan storage:link || true
 
             echo "== cache produksi (clear dulu) =="
-            $PHP_BIN artisan config:clear
-            $PHP_BIN artisan route:clear
-            $PHP_BIN artisan view:clear
-            $PHP_BIN artisan event:clear
-            $PHP_BIN artisan config:cache
-            $PHP_BIN artisan route:cache
-            $PHP_BIN artisan view:cache
-            $PHP_BIN artisan event:cache
+            fase "config:cache" $PHP_BIN artisan config:cache
+            fase "route:cache" $PHP_BIN artisan route:cache
+            fase "view:cache" $PHP_BIN artisan view:cache
+            fase "event:cache" $PHP_BIN artisan event:cache
 
             echo "== ringkasan =="
             $PHP_BIN artisan --version

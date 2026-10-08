@@ -23,6 +23,37 @@ const menuTampil = computed(() =>
   MENU.map((g) => ({ ...g, item: g.item.filter((m) => auth.bisa(m.izin)) })).filter((g) => g.item.length),
 )
 
+/** Tab navigasi bawah (mobile) — hanya menu utama; sisanya lewat tombol "Menu"
+ *  yang membuka sidebar sebagai drawer. */ 
+const tabBawah = computed(() => {
+  const tabs = [{ label: 'Beranda', to: '/', ikon: 'home', nama: 'dashboard' }]
+  if (auth.bisa('checkup.manage')) {
+    tabs.push({
+      label: 'Check Up',
+      to: '/checkups',
+      ikon: 'clipboardCheck',
+      nama: ['checkup', 'checkup-baru', 'checkup-detail', 'checkup-ubah'],
+    })
+  }
+  if (auth.bisa('service-order.manage')) {
+    tabs.push({
+      label: 'Form SA',
+      to: '/service-orders',
+      ikon: 'clipboardPen',
+      nama: ['sa', 'sa-baru', 'sa-detail', 'sa-ubah'],
+    })
+  }
+  if (auth.bisa('kasir.manage')) {
+    tabs.push({
+      label: 'Kasir',
+      to: '/kasir',
+      ikon: 'banknote',
+      nama: ['kasir', 'kasir-transaksi'],
+    })
+  }
+  return tabs
+})
+
 const judulHalaman = computed(() => route.meta?.judul || 'Dashboard')
 
 /** Aktif hanya bila NAMA RUTE cocok (lihat utils/menuAktif.js) — bukan awalan path,
@@ -45,7 +76,7 @@ async function keluar() {
 
 <template>
   <div class="min-h-screen bg-slate-50">
-    <!-- Sidebar -->
+    <!-- Sidebar (desktop tetap; di mobile menjadi drawer yang dibuka tombol "Menu") -->
     <aside
       class="no-print fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-slate-200 bg-white transition-transform lg:translate-x-0"
       :class="ui.sidebarTerbuka ? 'translate-x-0' : ''"
@@ -102,20 +133,15 @@ async function keluar() {
     />
 
     <!-- Konten -->
-    <div class="lg:pl-64">
+    <div class="pb-20 lg:pb-0 lg:pl-64">
       <header
         class="no-print sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6"
       >
-        <div class="flex min-w-0 items-center gap-3">
-          <button class="rounded-md p-2 text-slate-500 hover:bg-slate-100 lg:hidden" @click="ui.bukaSidebar()">
-            <AppIcon nama="menu" :ukuran="20" />
-          </button>
-          <div class="min-w-0">
-            <h1 class="truncate text-base font-semibold text-slate-800">{{ judulHalaman }}</h1>
-            <p class="truncate text-xs text-slate-400">{{ route.meta?.keterangan || 'Aplikasi Manajemen Service Bengkel' }}</p>
-          </div>
+        <div class="min-w-0">
+          <h1 class="truncate text-base font-semibold text-slate-800">{{ judulHalaman }}</h1>
+          <p class="truncate text-xs text-slate-400">{{ route.meta?.keterangan || 'Aplikasi Manajemen Service Bengkel' }}</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="hidden items-center gap-2 lg:flex">
           <RouterLink v-if="auth.bisa('checkup.manage')" to="/checkups/create">
             <BaseButton ukuran="sm" ikon="plus">Check Up</BaseButton>
           </RouterLink>
@@ -132,5 +158,34 @@ async function keluar() {
         <RouterView />
       </main>
     </div>
+
+    <!-- Navigasi bawah (mobile) -->
+    <nav
+      class="no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden"
+      aria-label="Navigasi utama"
+    >
+      <div
+        class="grid"
+        :style="{ gridTemplateColumns: `repeat(${tabBawah.length + 1}, minmax(0, 1fr))` }"
+      >
+        <RouterLink
+          v-for="m in tabBawah"
+          :key="m.to"
+          :to="m.to"
+          class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition"
+          :class="menuAktif(m, route) ? 'text-brand-600' : 'text-slate-500'"
+        >
+          <AppIcon :nama="m.ikon" :ukuran="20" />
+          {{ m.label }}
+        </RouterLink>
+        <button
+          class="flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-slate-500 transition"
+          @click="ui.bukaSidebar()"
+        >
+          <AppIcon nama="menu" :ukuran="20" />
+          Menu
+        </button>
+      </div>
+    </nav>
   </div>
 </template>

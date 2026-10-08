@@ -61,7 +61,7 @@ async function masuk() {
         v-model="form.login"
         label="Email atau No. HP"
         ikon="user"
-        placeholder="owner@bengkel.test / 08xxxxxxxxxx"
+        placeholder="email@contoh.com / 08xxxxxxxxxx"
         autofokus
       />
 
@@ -93,11 +93,5 @@ async function masuk() {
     <p v-if="$route.query.dari" class="mt-4 text-xs text-slate-400">
       Anda diarahkan ke halaman ini karena perlu masuk terlebih dahulu.
     </p>
-
-    <div v-if="$route.meta" class="mt-6 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-      <p class="font-medium text-slate-600">Akun demo (data contoh lokal):</p>
-      <p>Admin: owner@bengkel.test / owner12345</p>
-      <p>Member: 081211110001 (password tampil saat seeder dijalankan)</p>
-    </div>
   </AuthLayout>
 </template>

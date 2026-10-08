@@ -1,8 +1,12 @@
-# Deploy API (Laravel) ke subdomain api-…  — monorepo: HANYA berjalan bila backend/ berubah.
+# Deploy API (Laravel) ke subdomain api-… — monorepo: hanya jalan bila backend/ berubah.
 #
-# Alur: push ke main (atau tombol "Run workflow") → SSH ke cPanel → git pull → composer
-# → migrate → cache. Semua kegagalan ditulis sebagai ::error:: agar terbaca di tab
-# "Annotations" (tampilan Actions yang paling mudah dilihat).
+# CARA KERJA: berkas backend DIUNGGAH dari runner ke server (bukan `git pull`),
+# persis seperti workflow SPA. Alasannya: folder di server adalah TARGET deploy,
+# bukan salinan kerja git, sehingga tidak ada masalah branch/perubahan lokal —
+# dan berkas rahasia (.env) maupun dependensi (vendor/, storage/) TIDAK PERNAH
+# tersentuh karena semuanya tidak ada di dalam repo.
+#
+# Semua kegagalan ditulis sebagai ::error:: agar terbaca di tab "Annotations".
 name: Deploy API (Laravel)
 
 on:
@@ -38,62 +42,67 @@ jobs:
           SSH_KEY: ${{ secrets.SSH_KEY }}
           DEPLOY_PATH_API: ${{ secrets.DEPLOY_PATH_API }}
 
-      - name: Deploy lewat SSH
+      - uses: actions/checkout@v4
+
+      - name: Unggah berkas backend
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          # `backend` (bukan `backend/*`) supaya berkas titik seperti
+          # backend/public/.htaccess ikut; strip_components: 1 membuang awalan "backend/".
+          source: 'backend'
+          target: ${{ secrets.DEPLOY_PATH_API }}
+          strip_components: 1
+          overwrite: true
+
+      - name: Pasang dependensi & migrasi (SSH)
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          # Opsional: isi hanya bila kunci privat Anda dilindungi passphrase.
-          # Dibiarkan kosong = tidak ada passphrase.
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script_stop: true
           envs: PHP_BIN,DEPLOY_PATH_API
           script: |
             set -e
             PHP_BIN="${PHP_BIN:-php}"
+            echo "PHP: $($PHP_BIN -v 2>/dev/null | head -1 || echo 'TIDAK DITEMUKAN')"
 
-            # PHP versi berapa yang dipakai? Berguna saat ada kegagalan.
-            echo "PHP  : $($PHP_BIN -v | head -1)"
-            echo "PATH : $DEPLOY_PATH_API"
-
-            # --- pemeriksaan yang melaporkan penyebabnya sendiri lewat annotation ---
             if [ ! -d "$DEPLOY_PATH_API" ]; then
-              echo "::error title=FOLDER DEPLOY TIDAK ADA::$DEPLOY_PATH_API tidak ditemukan di server. Perbaiki secret DEPLOY_PATH_API, atau clone repo di sana."
+              echo "::error title=FOLDER DEPLOY TIDAK ADA::$DEPLOY_PATH_API tidak ditemukan. Perbaiki secret DEPLOY_PATH_API."
+              exit 1
+            fi
+            cd "$DEPLOY_PATH_API"
+
+            if [ ! -f artisan ]; then
+              echo "::error title=BUKAN APLIKASI LARAVEL::$DEPLOY_PATH_API tidak memuat artisan. Pastikan document root & DEPLOY_PATH_API menunjuk folder backend (bukan root repo)."
               exit 1
             fi
 
-            cd "$DEPLOY_PATH_API" || { echo "::error::Tidak bisa masuk ke $DEPLOY_PATH_API"; exit 1; }
-
-            if [ ! -d .git ]; then
-              echo "::error title=BUKAN REPO GIT::$DEPLOY_PATH_API belum di-clone dari GitHub. Isinya: $(ls -a | head -10 | tr '\n' ' ')"
+            if [ ! -f .env ]; then
+              echo "::error title=.env TIDAK ADA::Buat $DEPLOY_PATH_API/.env dari backend/.env.production.example lalu jalankan ulang."
               exit 1
             fi
 
-            echo "branch: $(git rev-parse --abbrev-ref HEAD) | commit: $(git rev-parse --short HEAD)"
-
-            # Composer: pakai binary bila ada, kalau tidak pakai composer.phar di home.
             if command -v composer >/dev/null 2>&1; then
               COMPOSER="composer"
             elif [ -f "$HOME/composer.phar" ]; then
               COMPOSER="$PHP_BIN $HOME/composer.phar"
             else
-              echo "::error::composer tidak ditemukan di server. Pasang lewat cPanel (Setup → Composer) atau unggah composer.phar ke home."
-              exit 1
-            fi
-
-            echo "== ambil kode terbaru =="
-            if ! git pull --ff-only origin main; then
-              kotor=$(git status --porcelain | head -5 | tr '\n' ' ')
-              echo "::error title=GIT PULL GAGAL::Branch $(git rev-parse --abbrev-ref HEAD) tidak bisa di-pull. Perubahan lokal tertahan: ${kotor:-tidak ada}. Jalankan di server: git status"
+              echo "::error title=COMPOSER TIDAK DITEMUKAN::Pasang Composer di server (cPanel → MultiPHP/Composer, atau unggah composer.phar ke folder home) lalu jalankan ulang."
               exit 1
             fi
 
             echo "== dependensi produksi =="
             $COMPOSER install --no-dev --optimize-autoloader --no-interaction
 
-            echo "== kunci aplikasi (hanya bila belum ada — TIDAK pernah menimpa kunci yang sudah dipakai) =="
+            echo "== kunci aplikasi (hanya bila belum ada — tidak pernah menimpa) =="
             if grep -q '^APP_KEY=base64:' .env 2>/dev/null; then
               echo "APP_KEY sudah ada, dilewati."
             else
@@ -101,12 +110,14 @@ jobs:
             fi
 
             echo "== migrasi database =="
-            $PHP_BIN artisan migrate --force
+            if ! $PHP_BIN artisan migrate --force; then
+              echo "::error title=MIGRASI GAGAL::Periksa DB_DATABASE / DB_USERNAME / DB_PASSWORD di .env server dan pastikan database sudah dibuat di cPanel → MySQL Databases."
+              exit 1
+            fi
 
-            echo "== simpan tautan storage =="
             $PHP_BIN artisan storage:link || true
 
-            echo "== cache produksi (clear dulu, kalau tidak nilai .env lama bisa tertahan) =="
+            echo "== cache produksi (clear dulu) =="
             $PHP_BIN artisan config:clear
             $PHP_BIN artisan route:clear
             $PHP_BIN artisan view:clear
@@ -118,43 +129,10 @@ jobs:
 
             echo "== ringkasan =="
             $PHP_BIN artisan --version
-            $PHP_BIN artisan migrate:status | tail -5
-
-      - name: Diagnostik koneksi (hanya bila deploy gagal)
-        if: failure()
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_KEY: ${{ secrets.SSH_KEY }}
-          DEPLOY_PATH_API: ${{ secrets.DEPLOY_PATH_API }}
-        run: |
-          set +e
-          P="${SSH_PORT:-22}"
-          printf '%s' "$SSH_KEY" > /tmp/k
-          chmod 600 /tmp/k
-
-          pesan="user=$SSH_USER host=$SSH_HOST port=$P"
-
-          if head -1 /tmp/k | grep -qE 'BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY'; then
-            pesan="$pesan | bentuk kunci: OK"
-          else
-            pesan="$pesan | bentuk kunci: BUKAN private key (kemungkinan kunci PUBLIK yang ditempel, atau isi SSH_KEY terpotong)"
-          fi
-
-          if timeout 8 bash -c "echo > /dev/tcp/$SSH_HOST/$P" 2>/dev/null; then
-            pesan="$pesan | port terbuka"
-            hasil=$(ssh -i /tmp/k -p "$P" -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$SSH_USER@$SSH_HOST" "whoami; test -d '$DEPLOY_PATH_API' && echo PATH_ADA || echo PATH_TIDAK_ADA; php -v 2>/dev/null | head -1" 2>&1 | tr '\n' ' ' | tail -c 240)
-            pesan="$pesan | ssh: $hasil"
-          else
-            pesan="$pesan | port TIDAK merespons (cek SSH_HOST / SSH_PORT / SSH dimatikan di cPanel)"
-          fi
-
-          echo "::error title=DIAGNOSIS SSH::$pesan"
+            echo "OK: deploy selesai"
 
       - name: Cek API hidup (bila API_URL diisi)
-        # Catatan: konteks `secrets` TIDAK boleh dipakai di `if` (GitHub Actions menolaknya),
-        # jadi nilainya dialirkan lewat env lebih dulu.
+        # Konteks `secrets` tidak boleh dipakai di `if`, jadi dialirkan lewat env.
         if: env.API_URL != ''
         env:
           API_URL: ${{ secrets.API_URL }}
@@ -163,7 +141,7 @@ jobs:
           kode=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$API_URL/ping" || true)
           echo "HTTP $kode dari $API_URL/ping"
           if [ "$kode" != "200" ]; then
-            echo "::error::API menjawab HTTP $kode. Cek: docroot subdomain harus menunjuk ke backend/public, lalu lihat storage/logs/laravel.log di server."
+            echo "::error::API menjawab HTTP $kode. Cek: document root subdomain API harus menunjuk folder backend/public, lalu lihat storage/logs/laravel.log di server."
             exit 1
           fi
           echo "::notice::API sehat (HTTP 200)."

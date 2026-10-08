@@ -103,6 +103,38 @@ jobs:
             $PHP_BIN artisan --version
             $PHP_BIN artisan migrate:status | tail -5
 
+      - name: Diagnostik koneksi (hanya bila deploy gagal)
+        if: failure()
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_PATH_API: ${{ secrets.DEPLOY_PATH_API }}
+        run: |
+          set +e
+          P="${SSH_PORT:-22}"
+          printf '%s' "$SSH_KEY" > /tmp/k
+          chmod 600 /tmp/k
+
+          pesan="user=$SSH_USER host=$SSH_HOST port=$P"
+
+          if head -1 /tmp/k | grep -qE 'BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY'; then
+            pesan="$pesan | bentuk kunci: OK"
+          else
+            pesan="$pesan | bentuk kunci: BUKAN private key (kemungkinan kunci PUBLIK yang ditempel, atau isi SSH_KEY terpotong)"
+          fi
+
+          if timeout 8 bash -c "echo > /dev/tcp/$SSH_HOST/$P" 2>/dev/null; then
+            pesan="$pesan | port terbuka"
+            hasil=$(ssh -i /tmp/k -p "$P" -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$SSH_USER@$SSH_HOST" "whoami; test -d '$DEPLOY_PATH_API' && echo PATH_ADA || echo PATH_TIDAK_ADA; php -v 2>/dev/null | head -1" 2>&1 | tr '\n' ' ' | tail -c 240)
+            pesan="$pesan | ssh: $hasil"
+          else
+            pesan="$pesan | port TIDAK merespons (cek SSH_HOST / SSH_PORT / SSH dimatikan di cPanel)"
+          fi
+
+          echo "::error title=DIAGNOSIS SSH::$pesan"
+
       - name: Cek API hidup (bila API_URL diisi)
         # Catatan: konteks `secrets` TIDAK boleh dipakai di `if` (GitHub Actions menolaknya),
         # jadi nilainya dialirkan lewat env lebih dulu.

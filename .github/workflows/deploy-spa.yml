@@ -75,6 +75,34 @@ jobs:
           strip_components: 2
           overwrite: true
 
+      - name: Diagnostik koneksi (hanya bila unggah gagal)
+        if: failure()
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_PATH_SPA: ${{ secrets.DEPLOY_PATH_SPA }}
+        run: |
+          set +e
+          P="${SSH_PORT:-22}"
+          printf '%s' "$SSH_KEY" > /tmp/k
+          chmod 600 /tmp/k
+          pesan="user=$SSH_USER host=$SSH_HOST port=$P"
+          if head -1 /tmp/k | grep -qE 'BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY'; then
+            pesan="$pesan | bentuk kunci: OK"
+          else
+            pesan="$pesan | bentuk kunci: BUKAN private key"
+          fi
+          if timeout 8 bash -c "echo > /dev/tcp/$SSH_HOST/$P" 2>/dev/null; then
+            pesan="$pesan | port terbuka"
+            hasil=$(ssh -i /tmp/k -p "$P" -o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 "$SSH_USER@$SSH_HOST" "test -d '$DEPLOY_PATH_SPA' && echo PATH_ADA || echo PATH_TIDAK_ADA" 2>&1 | tr '\n' ' ' | tail -c 160)
+            pesan="$pesan | ssh: $hasil"
+          else
+            pesan="$pesan | port TIDAK merespons"
+          fi
+          echo "::error title=DIAGNOSIS SSH::$pesan"
+
       - name: Cek SPA hidup (bila APP_URL diisi)
         # `secrets` tidak boleh dipakai langsung di `if` → dialirkan lewat env.
         if: env.APP_URL != ''

@@ -22,6 +22,7 @@ const emit = defineEmits(['update:modelValue', 'tersimpan'])
 
 const ui = useUiStore()
 const memuat = ref(false)
+const kunciIdem = ref((globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`))
 const galat = ref({})
 const form = reactive(bentukAwal())
 
@@ -73,6 +74,7 @@ function hapusKendaraan(i) {
 }
 
 async function simpan() {
+  if (memuat.value) return
   galat.value = {}
   if (!form.name.trim()) {
     galat.value = { name: 'Nama pelanggan wajib diisi.' }
@@ -82,6 +84,7 @@ async function simpan() {
   memuat.value = true
   try {
     const muatan = {
+      idempotency_key: props.pelanggan ? undefined : kunciIdem.value,
       name: form.name.trim(),
       gender: form.gender,
       phone: form.phone.trim() || null,

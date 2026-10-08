@@ -160,6 +160,7 @@ export const checkupApi = {
   detail: (id) => ambil(`/checkups/${id}`),
   simpan: (body) => kirim('/checkups', body),
   ubah: (id, body) => ubah(`/checkups/${id}`, body),
+  hapus: (id) => hapus(`/checkups/${id}`),
   selesai: (id, body) => kirim(`/checkups/${id}/finish`, body),
 }
 
@@ -182,6 +183,7 @@ export const saApi = {
   detail: (id) => ambil(`/service-orders/${id}`),
   simpan: (body) => kirim('/service-orders', body),
   ubah: (id, body) => ubah(`/service-orders/${id}`, body),
+  hapus: (id) => hapus(`/service-orders/${id}`),
   mulai: (id) => kirim(`/service-orders/${id}/start`),
   selesai: (id) => kirim(`/service-orders/${id}/finish`),
   bayar: (id, body) => kirim(`/service-orders/${id}/pay`, body),

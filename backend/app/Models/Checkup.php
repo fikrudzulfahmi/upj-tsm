@@ -15,6 +15,7 @@ class Checkup extends Model
     protected $fillable = [
         'checkup_no', 'unit_entry_id', 'customer_id', 'vehicle_id', 'checkup_template_id',
         'checkup_date', 'odometer', 'complaint', 'general_notes', 'result', 'status', 'created_by',
+        'idempotency_key',
     ];
 
     protected function casts(): array

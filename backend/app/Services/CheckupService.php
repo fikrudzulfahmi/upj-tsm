@@ -27,6 +27,14 @@ class CheckupService
      */
     public function simpan(array $data, ?Checkup $checkup = null, ?int $userId = null): Checkup
     {
+        // Idempotensi: kiriman ganda dengan kunci sama (klik dobel / retry) → kembalikan record lama.
+        if ($checkup === null && ! empty($data['idempotency_key'])) {
+            $existing = Checkup::where('idempotency_key', $data['idempotency_key'])->first();
+            if ($existing) {
+                return $existing->fresh(['results', 'customer', 'vehicle', 'template', 'unitEntry']);
+            }
+        }
+
         return DB::transaction(function () use ($data, $checkup, $userId) {
             $customer = Customer::findOrFail($data['customer_id']);
             $vehicle = Vehicle::findOrFail($data['vehicle_id']);
@@ -67,6 +75,7 @@ class CheckupService
                     'unit_entry_id' => $unitEntry->id,
                     'status' => CheckupStatus::Draft->value,
                     'created_by' => $userId ?? auth()->id(),
+                    'idempotency_key' => $data['idempotency_key'] ?? null,
                 ]);
 
                 $unitEntry->update(['checkup_id' => $checkup->id]);
@@ -137,5 +146,23 @@ class CheckupService
                 'sort_order' => $baris['sort_order'] ?? $i + 1,
             ]);
         }
+    }
+
+    /** Hapus check up (hanya draft) beserta unit entry yang menjadi yatim. */
+    public function hapus(Checkup $checkup): void
+    {
+        if ($checkup->status === CheckupStatus::Completed) {
+            throw new AturanBisnisException('Check up yang sudah selesai tidak dapat dihapus.');
+        }
+
+        DB::transaction(function () use ($checkup) {
+            $unitEntry = $checkup->unitEntry;
+            // results terhapus otomatis via cascade; unit_entry.checkup_id jadi null.
+            $checkup->delete();
+
+            if ($unitEntry && ! $unitEntry->service_order_id) {
+                $unitEntry->delete();
+            }
+        });
     }
 }

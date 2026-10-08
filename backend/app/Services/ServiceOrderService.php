@@ -39,6 +39,14 @@ class ServiceOrderService
 
     public function buat(array $data, ?int $userId = null): ServiceOrder
     {
+        // Idempotensi: kiriman ganda dengan kunci sama (klik dobel / retry) → kembalikan record lama.
+        if (! empty($data['idempotency_key'])) {
+            $existing = ServiceOrder::where('idempotency_key', $data['idempotency_key'])->first();
+            if ($existing) {
+                return $existing->fresh($this->relasiLengkap());
+            }
+        }
+
         return DB::transaction(function () use ($data, $userId) {
             $customer = Customer::findOrFail($data['customer_id']);
             $vehicle = Vehicle::findOrFail($data['vehicle_id']);
@@ -64,6 +72,7 @@ class ServiceOrderService
 
             $sa = ServiceOrder::create([
                 'sa_no' => $this->nomor->buat('SA'),
+                'idempotency_key' => $data['idempotency_key'] ?? null,
                 'unit_entry_id' => $unitEntry->id,
                 'checkup_id' => $data['checkup_id'] ?? null,
                 'customer_id' => $customer->id,
@@ -129,6 +138,24 @@ class ServiceOrderService
             $this->perbaruiOdometer($sa->vehicle, $data['odometer'] ?? $sa->odometer);
 
             return $sa->fresh($this->relasiLengkap());
+        });
+    }
+
+    /** Hapus Form SA (hanya draft) beserta isi + unit entry yang menjadi yatim. */
+    public function hapus(ServiceOrder $serviceOrder): void
+    {
+        if ($serviceOrder->status !== ServiceOrderStatus::Draft) {
+            throw new AturanBisnisException('Hanya Form SA berstatus Draft yang dapat dihapus.');
+        }
+
+        DB::transaction(function () use ($serviceOrder) {
+            $unitEntry = $serviceOrder->unitEntry;
+            // services/parts/conditions terhapus otomatis via cascade; unit_entry.service_order_id jadi null.
+            $serviceOrder->delete();
+
+            if ($unitEntry && ! $unitEntry->checkup_id) {
+                $unitEntry->delete();
+            }
         });
     }
 

@@ -16,6 +16,14 @@ class CustomerService
      */
     public function simpan(array $data, array $kendaraan = [], ?Customer $customer = null): Customer
     {
+        // Idempotensi: kiriman ganda dengan kunci sama (klik dobel / retry) → kembalikan record lama.
+        if ($customer === null && ! empty($data['idempotency_key'])) {
+            $existing = Customer::where('idempotency_key', $data['idempotency_key'])->first();
+            if ($existing) {
+                return $existing->fresh(['vehicles', 'membership']);
+            }
+        }
+
         return DB::transaction(function () use ($data, $kendaraan, $customer) {
             $muatan = [
                 'name' => trim($data['name']),
@@ -28,7 +36,7 @@ class CustomerService
             if ($customer) {
                 $customer->update($muatan);
             } else {
-                $customer = Customer::create($muatan);
+                $customer = Customer::create($muatan + ['idempotency_key' => $data['idempotency_key'] ?? null]);
             }
 
             foreach ($kendaraan as $k) {

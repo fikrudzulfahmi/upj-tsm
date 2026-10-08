@@ -60,7 +60,7 @@ Route::middleware(['auth:sanctum', 'aktif'])->group(function () {
         Route::post('/customers', [CustomerController::class, 'store']);
         Route::get('/customers/{customer}', [CustomerController::class, 'show']);
         Route::put('/customers/{customer}', [CustomerController::class, 'update']);
-        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+        Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->middleware('role:owner|admin');
 
         Route::post('/customers/{customer}/vehicles', [VehicleController::class, 'store']);
         Route::get('/vehicles/{vehicle}', [VehicleController::class, 'show']);
@@ -143,6 +143,7 @@ Route::middleware(['auth:sanctum', 'aktif'])->group(function () {
         Route::get('/checkups/{checkup}', [CheckupController::class, 'show']);
         Route::put('/checkups/{checkup}', [CheckupController::class, 'update']);
         Route::post('/checkups/{checkup}/finish', [CheckupController::class, 'finish']);
+        Route::delete('/checkups/{checkup}', [CheckupController::class, 'destroy'])->middleware('role:owner|admin');
     });
 
     /* ------------------------------------------------------------- Form SA --- */
@@ -155,6 +156,7 @@ Route::middleware(['auth:sanctum', 'aktif'])->group(function () {
         Route::post('/service-orders/{serviceOrder}/finish', [ServiceOrderController::class, 'finish']);
         Route::post('/service-orders/{serviceOrder}/cancel', [ServiceOrderController::class, 'cancel']);
         Route::get('/service-orders/{serviceOrder}/print', [ServiceOrderController::class, 'print']);
+        Route::delete('/service-orders/{serviceOrder}', [ServiceOrderController::class, 'destroy'])->middleware('role:owner|admin');
 
         Route::get('/unit-entries', [UnitEntryController::class, 'index']);
     });

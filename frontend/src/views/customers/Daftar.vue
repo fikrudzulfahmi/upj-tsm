@@ -165,7 +165,7 @@ function setelahSimpan() {
               @click="jadikanMember(baris)"
             />
             <BaseButton ukuran="ikon" varian="halus" ikon="pencil" title="Ubah" @click="bukaUbah(baris)" />
-            <BaseButton ukuran="ikon" varian="bahaya" ikon="trash" title="Hapus" @click="hapus(baris)" />
+            <BaseButton v-if="auth.isAdmin" ukuran="ikon" varian="bahaya" ikon="trash" title="Hapus" @click="hapus(baris)" />
           </div>
         </template>
       </BaseTable>

@@ -20,6 +20,7 @@ class SimpanServiceOrderRequest extends FormRequest
         return [
             'customer_id' => ['required', 'integer', 'exists:customers,id'],
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
             'checkup_id' => ['nullable', 'integer', 'exists:checkups,id'],
             'unit_entry_id' => ['nullable', 'integer', 'exists:unit_entries,id'],
             'mechanic_id' => ['nullable', 'integer', 'exists:mechanics,id'],

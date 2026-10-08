@@ -15,7 +15,7 @@ class Customer extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
 
-    protected $fillable = ['code', 'name', 'gender', 'phone', 'address', 'notes'];
+    protected $fillable = ['code', 'name', 'gender', 'phone', 'address', 'notes', 'idempotency_key'];
 
     public function getActivitylogOptions(): LogOptions
     {

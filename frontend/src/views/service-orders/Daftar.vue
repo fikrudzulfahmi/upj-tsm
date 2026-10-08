@@ -2,7 +2,9 @@
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { saApi } from '@/api'
+import { pesanGalat } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import { useDaftar } from '@/composables/useDaftar'
 import { formatRupiah, formatTanggal, formatTanggalJam } from '@/utils/format'
 import { statusSa } from '@/utils/status'
@@ -14,6 +16,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 
 const auth = useAuthStore()
+const ui = useUiStore()
 
 const kolom = [
   { kunci: 'sa_no', label: 'No. SA' },
@@ -36,6 +39,22 @@ const OPSI_STATUS = [
 ]
 
 onMounted(daftar.muat)
+
+async function hapus(baris) {
+  const ya = await ui.tanya({
+    judul: 'Hapus Form SA',
+    pesan: `Hapus ${baris.sa_no} untuk ${baris.customer_name}? Tindakan ini tidak dapat dibatalkan.`,
+    teksOk: 'Hapus',
+  })
+  if (!ya) return
+  try {
+    await saApi.hapus(baris.id)
+    ui.sukses('Form SA dihapus.')
+    daftar.muat()
+  } catch (e) {
+    ui.gagal(pesanGalat(e))
+  }
+}
 </script>
 
 <template>
@@ -99,6 +118,14 @@ onMounted(daftar.muat)
           <RouterLink v-if="['draft', 'in_progress'].includes(baris.status)" :to="`/service-orders/${baris.id}/edit`">
             <BaseButton ukuran="ikon" varian="garis" ikon="pencil" title="Ubah" />
           </RouterLink>
+          <BaseButton
+            v-if="auth.isAdmin && baris.status === 'draft'"
+            ukuran="ikon"
+            varian="bahaya"
+            ikon="trash"
+            title="Hapus"
+            @click="hapus(baris)"
+          />
         </div>
       </template>
     </BaseTable>

@@ -2,7 +2,9 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { checkupApi } from '@/api'
+import { pesanGalat } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import { useDaftar } from '@/composables/useDaftar'
 import { formatTanggal } from '@/utils/format'
 import BaseTable from '@/components/ui/BaseTable.vue'
@@ -13,6 +15,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue'
 import Pagination from '@/components/ui/Pagination.vue'
 
 const auth = useAuthStore()
+const ui = useUiStore()
 
 const kolom = [
   { kunci: 'checkup_no', label: 'No. Check Up' },
@@ -29,6 +32,22 @@ onMounted(daftar.muat)
 
 function warnaStatus(status) {
   return status === 'completed' ? 'sukses' : 'netral'
+}
+
+async function hapus(baris) {
+  const ya = await ui.tanya({
+    judul: 'Hapus check up',
+    pesan: `Hapus ${baris.checkup_no} untuk ${baris.customer?.name}? Tindakan ini tidak dapat dibatalkan.`,
+    teksOk: 'Hapus',
+  })
+  if (!ya) return
+  try {
+    await checkupApi.hapus(baris.id)
+    ui.sukses('Check up dihapus.')
+    daftar.muat()
+  } catch (e) {
+    ui.gagal(pesanGalat(e))
+  }
 }
 </script>
 
@@ -88,6 +107,14 @@ function warnaStatus(status) {
           <RouterLink v-if="baris.status === 'draft'" :to="`/checkups/${baris.id}/edit`">
             <BaseButton ukuran="ikon" varian="garis" ikon="pencil" title="Lanjutkan" />
           </RouterLink>
+          <BaseButton
+            v-if="auth.isAdmin && baris.status === 'draft'"
+            ukuran="ikon"
+            varian="bahaya"
+            ikon="trash"
+            title="Hapus"
+            @click="hapus(baris)"
+          />
         </div>
       </template>
     </BaseTable>

@@ -82,4 +82,12 @@ class CheckupController extends Controller
             ? 'Check up selesai dan Form SA sudah dibuat otomatis.'
             : 'Check up selesai.');
     }
+
+    /** Hapus check up (admin/owner saja). Hanya draft yang dapat dihapus. */
+    public function destroy(Checkup $checkup): JsonResponse
+    {
+        $this->checkupService->hapus($checkup);
+
+        return $this->sukses(null, 'Check up dihapus.');
+    }
 }

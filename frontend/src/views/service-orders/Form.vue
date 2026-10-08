@@ -30,6 +30,7 @@ const pengaturan = usePengaturanStore()
 const idUbah = computed(() => route.params.id || null)
 const memuat = ref(true)
 const menyimpan = ref(false)
+const kunciIdem = ref((globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`))
 const galat = ref({})
 const mekanik = ref([])
 const pelanggan = ref(null)
@@ -196,6 +197,7 @@ async function muatKondisiDariCheckup() {
 
 function muatan() {
   return {
+    idempotency_key: idUbah.value ? undefined : kunciIdem.value,
     customer_id: form.pelanggan_id,
     vehicle_id: form.kendaraan_id,
     checkup_id: form.checkup_id,
@@ -215,6 +217,7 @@ function muatan() {
 }
 
 async function simpan(diam = false) {
+  if (menyimpan.value) return null
   galat.value = {}
   if (!form.pelanggan_id || !form.kendaraan_id) {
     ui.gagal('Pelanggan dan kendaraan wajib dipilih.')

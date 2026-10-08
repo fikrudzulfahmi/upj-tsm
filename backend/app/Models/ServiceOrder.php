@@ -23,6 +23,7 @@ class ServiceOrder extends Model
         'subtotal_services', 'discount_services', 'total_services', 'total_parts',
         'grand_total', 'estimate_total', 'status', 'finished_at', 'paid_at',
         'payment_method', 'paid_amount', 'cancel_reason', 'notes', 'created_by',
+        'idempotency_key',
     ];
 
     protected function casts(): array

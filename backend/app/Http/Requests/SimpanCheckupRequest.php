@@ -20,6 +20,7 @@ class SimpanCheckupRequest extends FormRequest
             'vehicle_id' => ['required', 'integer', 'exists:vehicles,id'],
             'checkup_template_id' => ['nullable', 'integer', 'exists:checkup_templates,id'],
             'checkup_date' => ['nullable', 'date'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
             'odometer' => ['nullable', 'integer', 'min:0'],
             'complaint' => ['nullable', 'string', 'max:2000'],
             'general_notes' => ['nullable', 'string', 'max:2000'],

@@ -105,6 +105,14 @@ class ServiceOrderController extends Controller
         return $this->sukses(new ServiceOrderResource($sa), 'Form SA dibatalkan. Stok dan catatan keuangan sudah disesuaikan.');
     }
 
+    /** Hapus Form SA (admin/owner saja). Hanya draft yang dapat dihapus. */
+    public function destroy(ServiceOrder $serviceOrder): JsonResponse
+    {
+        $this->serviceOrder->hapus($serviceOrder);
+
+        return $this->sukses(null, 'Form SA dihapus.');
+    }
+
     /** Cetak Form SA / nota (PDF). */
     public function print(ServiceOrder $serviceOrder): Response
     {

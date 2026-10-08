@@ -40,6 +40,7 @@ class SimpanPelangganRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:120'],
+            'idempotency_key' => ['nullable', 'string', 'max:64'],
             'gender' => ['nullable', Rule::in(['L', 'P'])],
             'phone' => ['nullable', 'string', 'max:25', Rule::unique('customers', 'phone')->ignore($idPelanggan)->whereNull('deleted_at')],
             'address' => ['nullable', 'string', 'max:500'],

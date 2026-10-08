@@ -24,6 +24,8 @@ const pengaturan = usePengaturanStore()
 const idUbah = computed(() => route.params.id || null)
 const memuat = ref(!!route.params.id)
 const menyimpan = ref(false)
+const menyelesaikan = ref(false)
+const kunciIdem = ref((globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`))
 const galat = ref({})
 const modalSelesai = ref(false)
 const template = ref(null)
@@ -105,6 +107,7 @@ onMounted(async () => {
 })
 
 async function simpan(diam = false) {
+  if (menyimpan.value) return null
   galat.value = {}
   if (!form.pelanggan_id || !form.kendaraan_id) {
     galat.value = { pelanggan_id: 'Pelanggan dan kendaraan wajib dipilih.' }
@@ -115,6 +118,7 @@ async function simpan(diam = false) {
   menyimpan.value = true
   try {
     const muatan = {
+      idempotency_key: idUbah.value ? undefined : kunciIdem.value,
       customer_id: form.pelanggan_id,
       vehicle_id: form.kendaraan_id,
       checkup_template_id: template.value?.id || null,
@@ -144,10 +148,12 @@ async function simpanDraft() {
 }
 
 async function selesaikan(hasil) {
-  const data = await simpan(true)
-  if (!data) return
-
+  if (menyelesaikan.value) return
+  menyelesaikan.value = true
   try {
+    const data = await simpan(true)
+    if (!data) return
+
     const res = await checkupApi.selesai(data.id, { result: hasil })
     modalSelesai.value = false
 
@@ -160,6 +166,8 @@ async function selesaikan(hasil) {
     }
   } catch (e) {
     ui.gagal(pesanGalat(e))
+  } finally {
+    menyelesaikan.value = false
   }
 }
 </script>
@@ -220,7 +228,8 @@ async function selesaikan(hasil) {
       <p class="text-sm text-slate-600">Pilih tindak lanjut untuk kunjungan ini:</p>
       <div class="mt-4 grid gap-2">
         <button
-          class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-left hover:border-brand-400 hover:bg-brand-50"
+          class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-left transition hover:border-brand-400 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="menyelesaikan"
           @click="selesaikan('checkup_only')"
         >
           <AppIcon nama="clipboardCheck" :ukuran="20" class="mt-0.5 text-slate-500" />
@@ -230,7 +239,8 @@ async function selesaikan(hasil) {
           </span>
         </button>
         <button
-          class="flex items-start gap-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-left hover:border-brand-500 hover:bg-brand-50"
+          class="flex items-start gap-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3 text-left transition hover:border-brand-500 hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="menyelesaikan"
           @click="selesaikan('continue_service')"
         >
           <AppIcon nama="wrench" :ukuran="20" class="mt-0.5 text-brand-600" />

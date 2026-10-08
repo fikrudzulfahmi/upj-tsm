@@ -138,6 +138,43 @@ jobs:
             $PHP_BIN artisan --version
             echo "OK: deploy selesai"
 
+      - name: Diagnostik prasyarat (hanya bila gagal)
+        # Memeriksa semua syarat deploy satu per satu dan melaporkannya sebagai
+        # annotation — supaya penyebabnya terbaca tanpa perlu membuka log.
+        if: failure()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          envs: PHP_BIN,DEPLOY_PATH_API
+          script: |
+            PHP_BIN="${PHP_BIN:-php}"
+            echo "::warning title=P1 PHP BIN::PHP_BIN=${PHP_BIN} → $($PHP_BIN -v 2>/dev/null | head -1 || echo TIDAK_BISA_DIJALANKAN)"
+
+            cd "$DEPLOY_PATH_API" 2>/dev/null || { echo "::warning title=P2 FOLDER::$DEPLOY_PATH_API TIDAK ADA"; exit 0; }
+            echo "::warning title=P2 FOLDER::ada, isi: $(ls -a | head -12 | tr '\n' ' ')"
+
+            [ -f artisan ] && echo "::warning title=P3 ARTISAN::artisan ADA" || echo "::warning title=P3 ARTISAN::artisan TIDAK ADA"
+            [ -f .env ] && echo "::warning title=P4 ENV::.env ADA" || echo "::warning title=P4 ENV::.env TIDAK ADA"
+            if [ -f .env ]; then
+              echo "::warning title=P5 APP KEY::$(grep -q '^APP_KEY=base64:' .env && echo 'APP_KEY terisi' || echo 'APP_KEY KOSONG')"
+              echo "::warning title=P6 ENV PENTING::$(grep -E '^(APP_ENV|APP_DEBUG|APP_URL|FRONTEND_URL|DB_DATABASE|DB_USERNAME)=' .env | tr '\n' ' ')"
+            fi
+            [ -d vendor ] && echo "::warning title=P7 VENDOR::vendor/ ADA" || echo "::warning title=P7 VENDOR::vendor/ TIDAK ADA"
+            command -v composer >/dev/null 2>&1 && echo "::warning title=P8 COMPOSER::composer ada di PATH ($(command -v composer))" || echo "::warning title=P8 COMPOSER::composer TIDAK ADA di PATH; composer.phar di home? $([ -f "$HOME/composer.phar" ] && echo ADA || echo TIDAK ADA)"
+
+            keluar=$($PHP_BIN artisan --version 2>&1 | tr '\n' ' ' | tail -c 200)
+            echo "::warning title=P9 ARTISAN VERSION::$keluar"
+
+            if [ -d vendor ]; then
+              db=$($PHP_BIN artisan migrate:status 2>&1 | tail -4 | tr '\n' ' ' | tail -c 260)
+              echo "::warning title=P10 MIGRASI/DB::$db"
+            fi
+            exit 0
+
       - name: Cek API hidup (bila API_URL diisi)
         # Konteks `secrets` tidak boleh dipakai di `if`, jadi dialirkan lewat env.
         if: env.API_URL != ''

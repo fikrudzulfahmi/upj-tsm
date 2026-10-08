@@ -58,7 +58,20 @@ jobs:
             echo "PHP  : $($PHP_BIN -v | head -1)"
             echo "PATH : $DEPLOY_PATH_API"
 
-            cd "$DEPLOY_PATH_API"
+            # --- pemeriksaan yang melaporkan penyebabnya sendiri lewat annotation ---
+            if [ ! -d "$DEPLOY_PATH_API" ]; then
+              echo "::error title=FOLDER DEPLOY TIDAK ADA::$DEPLOY_PATH_API tidak ditemukan di server. Perbaiki secret DEPLOY_PATH_API, atau clone repo di sana."
+              exit 1
+            fi
+
+            cd "$DEPLOY_PATH_API" || { echo "::error::Tidak bisa masuk ke $DEPLOY_PATH_API"; exit 1; }
+
+            if [ ! -d .git ]; then
+              echo "::error title=BUKAN REPO GIT::$DEPLOY_PATH_API belum di-clone dari GitHub. Isinya: $(ls -a | head -10 | tr '\n' ' ')"
+              exit 1
+            fi
+
+            echo "branch: $(git rev-parse --abbrev-ref HEAD) | commit: $(git rev-parse --short HEAD)"
 
             # Composer: pakai binary bila ada, kalau tidak pakai composer.phar di home.
             if command -v composer >/dev/null 2>&1; then
@@ -71,7 +84,11 @@ jobs:
             fi
 
             echo "== ambil kode terbaru =="
-            git pull --ff-only origin main
+            if ! git pull --ff-only origin main; then
+              kotor=$(git status --porcelain | head -5 | tr '\n' ' ')
+              echo "::error title=GIT PULL GAGAL::Branch $(git rev-parse --abbrev-ref HEAD) tidak bisa di-pull. Perubahan lokal tertahan: ${kotor:-tidak ada}. Jalankan di server: git status"
+              exit 1
+            fi
 
             echo "== dependensi produksi =="
             $COMPOSER install --no-dev --optimize-autoloader --no-interaction

@@ -148,13 +148,9 @@ class CheckupService
         }
     }
 
-    /** Hapus check up (hanya draft) beserta unit entry yang menjadi yatim. */
+    /** Hapus check up (admin/owner saja) beserta unit entry yang menjadi yatim. */
     public function hapus(Checkup $checkup): void
     {
-        if ($checkup->status === CheckupStatus::Completed) {
-            throw new AturanBisnisException('Check up yang sudah selesai tidak dapat dihapus.');
-        }
-
         DB::transaction(function () use ($checkup) {
             $unitEntry = $checkup->unitEntry;
             // results terhapus otomatis via cascade; unit_entry.checkup_id jadi null.

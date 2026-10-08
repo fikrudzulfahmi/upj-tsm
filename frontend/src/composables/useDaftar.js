@@ -19,7 +19,7 @@ export function useDaftar(pengambil, opsi = {}) {
     memuat.value = true
     galat.value = null
     try {
-      const res = await pengambil({ ...filter, per_page: meta.per_halaman })
+      const res = await pengambil({ ...filter, page: filter.halaman, per_page: meta.per_halaman })
       baris.value = res.data || []
       // Seluruh meta disalin apa adanya: endpoint kasir/laporan menitipkan
       // ringkasan & rekap di sini, sehingga tidak perlu permintaan kedua.

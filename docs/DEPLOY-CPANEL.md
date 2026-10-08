@@ -123,6 +123,19 @@ Untuk SPA, cara termudah adalah **jalankan workflow** (tab Actions → *Deploy S
 *Run workflow*), atau sementara unggah manual isi `frontend/dist` dari laptop ke
 document root SPA (termasuk berkas `.htaccess` yang tersembunyi).
 
+## 5b. Instalasi pertama atau reset database (mode FRESH)
+
+Tab **Actions** → **Deploy API (Laravel)** → tombol **Run workflow** → **centang `fresh`** → **Run workflow**.
+
+Mode ini menjalankan `migrate:fresh --force` (seluruh tabel dibuang lalu dibangun ulang
+**kosong**) dan 3 seeder wajib: **peran & izin**, **pengaturan awal** (diambil dari `.env`
+bengkel), dan **akun owner**. Tidak ada satu pun data contoh.
+
+Kapan dipakai:
+- instalasi pertama, dan
+- setelah migrasi pernah gagal separuh jalan (gejala `1050 Table 'x' already exists`) —
+  percobaan ulang dengan `migrate` biasa **tidak akan berhasil** karena tabel parsial sudah telanjur terbuat.
+
 ## 6. Secrets GitHub (satu repo → diisi sekali)
 
 **Settings → Secrets and variables → Actions → New repository secret**
@@ -167,7 +180,9 @@ selalu diunggah dari hasil build di GitHub, bukan dari salinan repo di server.
 |---|---|
 | SPA terbuka tapi semua data kosong / "Tidak dapat terhubung ke server" | `VITE_API_URL` salah (dibakar saat build) → perbaiki secret, **jalankan ulang workflow SPA**. Cek juga Console peramban untuk galat CORS |
 | `/kasir` 404 saat di-refresh | `.htaccess` tidak ikut terunggah ke document root SPA |
-| API 500 | `~/repos/bengkel/backend/storage/logs/laravel.log` |
+| API 500 setelah deploy pertama | `storage/logs/laravel.log` di server |
+| Migrasi gagal `1071 Specified key was too long` | Default engine database di cPanel adalah MyISAM (indeks maksimum 1000 byte). Perbaikan sudah ada di repo (`engine => InnoDB` + `defaultStringLength(191)`); pastikan berkas terbaru sudah ter-unggah |
+| Migrasi gagal `1050 Table 'x' already exists` | Sisa tabel dari migrasi yang gagal separuh jalan → jalankan workflow dengan mode **FRESH** (§5b) |
 | API 404 untuk semua `/api/...` | document root subdomain API belum menunjuk `backend/public` |
 | HTTPS "not private" | dropdown Domain salah saat membuat subdomain (§3) → hapus, buat ulang, Run AutoSSL |
 | Tidak bisa login padahal password benar | `FRONTEND_URL` di `.env` server belum memuat origin SPA → CORS memblokir |

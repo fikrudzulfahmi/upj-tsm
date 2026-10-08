@@ -58,7 +58,11 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
-            'engine' => null,
+            // WAJIB: hosting cPanel sering memakai default engine MyISAM yang hanya
+            // mengizinkan indeks 1000 byte, sehingga migrasi gagal "1071 Specified key
+            // was too long" (mis. password_reset_tokens.email varchar(255) utf8mb4 = 1020 byte).
+            // Dipaksa InnoDB agar indeks panjang aman sekaligus foreign key benar-benar berlaku.
+            'engine' => env('DB_ENGINE', 'InnoDB'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
@@ -78,7 +82,11 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'strict' => true,
-            'engine' => null,
+            // WAJIB: hosting cPanel sering memakai default engine MyISAM yang hanya
+            // mengizinkan indeks 1000 byte, sehingga migrasi gagal "1071 Specified key
+            // was too long" (mis. password_reset_tokens.email varchar(255) utf8mb4 = 1020 byte).
+            // Dipaksa InnoDB agar indeks panjang aman sekaligus foreign key benar-benar berlaku.
+            'engine' => env('DB_ENGINE', 'InnoDB'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],

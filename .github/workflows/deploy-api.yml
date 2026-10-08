@@ -67,7 +67,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          script_stop: true
+          # CATATAN: `script_stop` sengaja TIDAK dipakai — dengan opsi itu keluaran
+          # sesi SSH tidak lagi dibaca sebagai perintah workflow, sehingga pesan
+          # ::error:: buatan kita tidak muncul di tab Annotations.
           envs: PHP_BIN,DEPLOY_PATH_API
           script: |
             set -e
@@ -90,14 +92,28 @@ jobs:
               exit 1
             fi
 
+            # Composer: pakai yang ada; kalau belum ada, unduh sendiri ke folder home
+            # supaya deploy pertama tidak perlu pemasangan manual di cPanel.
             if command -v composer >/dev/null 2>&1; then
               set -- composer
+              echo "Composer: $($PHP_BIN $(command -v composer) --version 2>/dev/null | head -1)"
             elif [ -f "$HOME/composer.phar" ]; then
               set -- "$PHP_BIN" "$HOME/composer.phar"
+              echo "Composer: pakai $HOME/composer.phar"
             else
-              echo "::error title=COMPOSER TIDAK DITEMUKAN::Pasang Composer di server (cPanel → MultiPHP/Composer, atau unggah composer.phar ke folder home) lalu jalankan ulang."
-              exit 1
+              echo "== Composer belum ada di server — mengunduh ke folder home =="
+              if $PHP_BIN -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');" 2>/tmp/composer-unduh.log \
+                 && $PHP_BIN /tmp/composer-setup.php --install-dir="$HOME" --filename=composer.phar --quiet 2>>/tmp/composer-unduh.log \
+                 && [ -f "$HOME/composer.phar" ]; then
+                set -- "$PHP_BIN" "$HOME/composer.phar"
+                echo "Composer berhasil dipasang: $($PHP_BIN $HOME/composer.phar --version 2>/dev/null | head -1)"
+              else
+                echo "::error title=COMPOSER GAGAL DIPASANG::$(tail -c 300 /tmp/composer-unduh.log | tr '\n' ' ') — pasang manual: unggah composer.phar ke folder home server."
+                exit 1
+              fi
             fi
+
+            export COMPOSER_MEMORY_LIMIT=-1
 
             # Setiap fase melaporkan sendiri bila gagal: pesan ringkas + potongan
             # keluaran terakhir dilampirkan sebagai annotation (agar tidak perlu log).

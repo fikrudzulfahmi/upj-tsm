@@ -66,6 +66,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
+          # Opsional: hanya bila kunci privat dilindungi passphrase.
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           # Seluruh DIREKTORI dist diunggah (bukan dist/*) supaya berkas titik seperti
           # .htaccess ikut. strip_components: 2 membuang "frontend/dist" dari tiap entri.
           source: 'frontend/dist'

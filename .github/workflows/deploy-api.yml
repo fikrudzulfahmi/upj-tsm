@@ -45,6 +45,9 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
+          # Opsional: isi hanya bila kunci privat Anda dilindungi passphrase.
+          # Dibiarkan kosong = tidak ada passphrase.
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script_stop: true
           envs: PHP_BIN,DEPLOY_PATH_API
           script: |

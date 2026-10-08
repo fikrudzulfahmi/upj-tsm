@@ -132,6 +132,7 @@ document root SPA (termasuk berkas `.htaccess` yang tersembunyi).
 | `SSH_USER` | user cPanel | ✅ |
 | `SSH_PORT` | biasanya `22` | ✅ |
 | `SSH_KEY` | **isi** kunci privat yang Anda miliki (seluruh isi berkas, termasuk baris `BEGIN`/`END`) | ✅ |
+| `SSH_PASSPHRASE` | hanya bila kunci privat Anda dilindungi passphrase; kalau tidak, biarkan belum dibuat | – |
 | `DEPLOY_PATH_API` | `/home/USER/repos/bengkel/backend` | ✅ |
 | `DEPLOY_PATH_SPA` | `/home/USER/bengkel-spa` | ✅ |
 | `VITE_API_URL` | `https://api-bengkel.domain-anda.com/api/v1` | ✅ |

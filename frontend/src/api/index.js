@@ -169,6 +169,7 @@ export const templateApi = {
   simpan: (body) => kirim('/checkup-templates', body),
   ubah: (id, body) => ubah(`/checkup-templates/${id}`, body),
   hapus: (id) => hapus(`/checkup-templates/${id}`),
+  duplikat: (id) => kirim(`/checkup-templates/${id}/duplikat`, {}),
   tambahItem: (id, body) => kirim(`/checkup-templates/${id}/items`, body),
   ubahItem: (id, itemId, body) => ubah(`/checkup-templates/${id}/items/${itemId}`, body),
   hapusItem: (id, itemId) => hapus(`/checkup-templates/${id}/items/${itemId}`),

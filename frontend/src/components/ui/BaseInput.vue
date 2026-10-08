@@ -19,7 +19,9 @@ const props = defineProps({
   maksPanjang: { type: [String, Number], default: undefined },
   masukanKelas: { type: String, default: '' },
 })
-const emit = defineEmits(['update:modelValue', 'enter', 'blur'])
+// 'input' ikut di-emit (passthrough) supaya induk bisa memakai @input —
+// tanpa didaftarkan di sini, Vue memunculkan peringatan di setiap halaman berisi input.
+const emit = defineEmits(['update:modelValue', 'input', 'enter', 'blur'])
 const kelasInput = computed(() => [props.galat ? 'border-brand-400 focus:ring-brand-100' : '', props.masukanKelas])
 </script>
 

@@ -129,6 +129,7 @@ Route::middleware(['auth:sanctum', 'aktif'])->group(function () {
         Route::put('/checkup-templates/{checkupTemplate}', [CheckupTemplateController::class, 'update'])->middleware('permission:setting.manage');
         Route::delete('/checkup-templates/{checkupTemplate}', [CheckupTemplateController::class, 'destroy'])->middleware('permission:setting.manage');
 
+        Route::post('/checkup-templates/{checkupTemplate}/duplikat', [CheckupTemplateController::class, 'duplikat'])->middleware('permission:setting.manage');
         Route::post('/checkup-templates/{checkupTemplate}/items', [CheckupTemplateController::class, 'storeItem'])->middleware('permission:setting.manage');
         Route::put('/checkup-templates/{checkupTemplate}/items/{item}', [CheckupTemplateController::class, 'updateItem'])->middleware('permission:setting.manage');
         Route::delete('/checkup-templates/{checkupTemplate}/items/{item}', [CheckupTemplateController::class, 'destroyItem'])->middleware('permission:setting.manage');

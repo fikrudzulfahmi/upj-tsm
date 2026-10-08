@@ -18,7 +18,9 @@ export function buatBarisDariTemplate(items, hasilLama = []) {
     return {
       category: it.category,
       item_name: it.name,
-      status: lama?.status || 'ok',
+      // Default "Tidak diperiksa": item baru TIDAK dianggap OK sebelum petugas
+      // benar-benar memeriksanya (permintaan user).
+      status: lama?.status || 'tidak_diperiksa',
       note: lama?.note || '',
       sort_order: it.sort_order ?? i + 1,
     }

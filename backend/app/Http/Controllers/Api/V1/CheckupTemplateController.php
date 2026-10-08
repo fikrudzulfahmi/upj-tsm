@@ -11,6 +11,7 @@ use App\Models\CheckupTemplateItem;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CheckupTemplateController extends Controller
 {
@@ -47,6 +48,55 @@ class CheckupTemplateController extends Controller
         $template = CheckupTemplate::create($request->validated() + ['is_active' => $request->boolean('is_active', true)]);
 
         return $this->dibuat(new CheckupTemplateResource($template->load('items')), 'Template check up berhasil disimpan.');
+    }
+
+    /**
+     * Salin template beserta SELURUH itemnya dalam satu transaksi.
+     *
+     * Sengaja di server, bukan loop permintaan dari klien: salinan tidak bisa
+     * tersalin separuh bila tab ditutup di tengah proses, jauh lebih cepat, dan
+     * tidak membebani pembatas laju API. Dibuktikan pada template 29 item.
+     */
+    public function duplikat(CheckupTemplate $checkupTemplate): JsonResponse
+    {
+        $salinan = DB::transaction(function () use ($checkupTemplate) {
+            $baru = CheckupTemplate::create([
+                'name' => $this->namaSalinan($checkupTemplate->name),
+                'vehicle_type' => $checkupTemplate->vehicle_type,
+                'is_active' => true,
+            ]);
+
+            foreach ($checkupTemplate->items()->orderBy('sort_order')->orderBy('id')->get() as $item) {
+                $baru->items()->create([
+                    'category' => $item->category,
+                    'name' => $item->name,
+                    'sort_order' => $item->sort_order,
+                    'is_active' => $item->is_active,
+                ]);
+            }
+
+            return $baru;
+        });
+
+        return $this->dibuat(
+            new CheckupTemplateResource($salinan->load('items')->loadCount('items')),
+            'Template berhasil disalin.',
+        );
+    }
+
+    /** Nama salinan yang tidak bertumpuk: "X (salinan)", "X (salinan 2)", … */
+    private function namaSalinan(string $nama): string
+    {
+        $dasar = preg_replace('/ \(salinan( \d+)?\)$/', '', $nama) ?? $nama;
+        $dasar = mb_substr($dasar, 0, 100);
+
+        $kandidat = $dasar.' (salinan)';
+        $n = 2;
+        while (CheckupTemplate::where('name', $kandidat)->exists()) {
+            $kandidat = $dasar.' (salinan '.$n++.')';
+        }
+
+        return $kandidat;
     }
 
     public function show(CheckupTemplate $checkupTemplate): JsonResponse

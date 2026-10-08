@@ -2,6 +2,10 @@
 /**
  * Form/daftar hasil pemeriksaan check up — dipakai di form Check Up (bisaEdit)
  * dan ditampilkan ulang di Form SA (read-only).
+ *
+ * Kontrol kondisi memakai KOTAK CEKLIS (bukan tombol pudar) supaya jelas terlihat
+ * mana yang sedang terpilih. Satu item hanya boleh punya satu kondisi, jadi
+ * perilakunya seperti pilihan tunggal walau tampilannya ceklis.
  */
 import { computed } from 'vue'
 import { kelompokkanPerKategori, ringkasHasil, STATUS_ITEM } from '@/utils/checkup'
@@ -17,6 +21,33 @@ const emit = defineEmits(['update:baris'])
 const grup = computed(() => kelompokkanPerKategori(props.baris))
 const ringkas = computed(() => ringkasHasil(props.baris))
 
+/** Warna kotak ceklis saat terpilih — sejalan dengan peta warna .status-* di style.css. */
+const KOTAK_TERPILIH = {
+  ok: 'border-emerald-500 bg-emerald-100 text-emerald-700',
+  perlu_perhatian: 'border-amber-500 bg-amber-100 text-amber-700',
+  rusak: 'border-brand-500 bg-brand-100 text-brand-700',
+  tidak_diperiksa: 'border-slate-400 bg-slate-100 text-slate-600',
+}
+const TANDA_TERPILIH = {
+  ok: 'border-emerald-600 bg-emerald-600',
+  perlu_perhatian: 'border-amber-500 bg-amber-500',
+  rusak: 'border-brand-600 bg-brand-600',
+  tidak_diperiksa: 'border-slate-500 bg-slate-500',
+}
+
+function kelasKotak(nilai, terpilih) {
+  const dasar =
+    'inline-flex cursor-pointer select-none items-center gap-1.5 rounded-lg border-[1.5px] px-2.5 py-1 text-[11px] font-semibold transition'
+  return terpilih
+    ? `${dasar} ${KOTAK_TERPILIH[nilai]}`
+    : `${dasar} border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50`
+}
+
+function kelasTanda(nilai, terpilih) {
+  const dasar = 'grid h-[15px] w-[15px] shrink-0 place-items-center rounded border-[1.5px]'
+  return terpilih ? `${dasar} ${TANDA_TERPILIH[nilai]}` : `${dasar} border-slate-300 bg-white`
+}
+
 function ubahStatus(item, status) {
   emit(
     'update:baris',
@@ -30,6 +61,7 @@ function ubahCatatan(item, note) {
   )
 }
 const kelasStatus = (kode) => `status-${kode}`
+const namaGrup = (item) => `status-${item.category}-${item.item_name}`
 </script>
 
 <template>
@@ -59,21 +91,31 @@ const kelasStatus = (kode) => `status-${kode}`
           <div v-for="item in g.items" :key="item.item_name" class="rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-medium text-slate-700">{{ item.item_name }}</p>
-              <div v-if="bisaEdit" class="flex flex-wrap gap-1">
-                <button
+
+              <!-- Mode ubah: empat kotak ceklis (satu terpilih) -->
+              <div v-if="bisaEdit" class="flex flex-wrap gap-1.5">
+                <label
                   v-for="s in STATUS_ITEM"
                   :key="s.nilai"
-                  type="button"
-                  class="rounded-md px-2 py-1 text-[11px] font-medium transition"
-                  :class="[
-                    kelasStatus(s.nilai),
-                    item.status === s.nilai ? 'ring-2 ring-offset-1 ring-slate-400' : 'opacity-60 hover:opacity-100',
-                  ]"
-                  @click="ubahStatus(item, s.nilai)"
+                  :class="kelasKotak(s.nilai, item.status === s.nilai)"
+                  :title="`Tandai '${s.label}'`"
                 >
+                  <input
+                    type="radio"
+                    class="sr-only"
+                    :name="namaGrup(item)"
+                    :value="s.nilai"
+                    :checked="item.status === s.nilai"
+                    @change="ubahStatus(item, s.nilai)"
+                  />
+                  <span :class="kelasTanda(s.nilai, item.status === s.nilai)">
+                    <AppIcon v-if="item.status === s.nilai" nama="check" :ukuran="11" class="text-white" />
+                  </span>
                   {{ s.label }}
-                </button>
+                </label>
               </div>
+
+              <!-- Mode baca (Form SA): tampil sebagai label kondisi -->
               <span
                 v-else
                 class="rounded-md px-2 py-1 text-[11px] font-medium"

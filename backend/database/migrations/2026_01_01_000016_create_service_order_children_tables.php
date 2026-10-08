@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('service_order_id')->constrained()->cascadeOnDelete();
             $table->string('category', 60);
             $table->string('item_name');
-            $table->enum('status', ['ok', 'perlu_perhatian', 'rusak', 'tidak_diperiksa'])->default('ok');
+            $table->enum('status', ['ok', 'perlu_perhatian', 'rusak', 'tidak_diperiksa'])->default('tidak_diperiksa');
             $table->text('note')->nullable();
             $table->integer('sort_order')->default(0);
             $table->timestamps();

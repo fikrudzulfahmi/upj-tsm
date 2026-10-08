@@ -6,6 +6,7 @@ use App\Models\Checkup;
 use App\Models\ServiceOrder;
 use App\Models\UnitEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\MembantuBengkel;
 use Tests\TestCase;
 
@@ -64,6 +65,66 @@ class CheckupFlowTest extends TestCase
         $rusak = $checkup->results()->where('status', 'rusak')->first();
         $this->assertNotNull($rusak);
         $this->assertNotEmpty($rusak->item_name);
+    }
+
+    public function test_baris_hasil_wajib_menyertakan_status_kondisi(): void
+    {
+        // Kontrak: server TIDAK mengisi kondisi sendiri. Baris tanpa `status` ditolak,
+        // supaya tidak ada item yang "diam-diam" tercatat sudah diperiksa padahal belum.
+        $pelanggan = $this->pelanggan();
+        $kendaraan = $pelanggan->vehicles->first();
+
+        $this->postJson('/api/v1/checkups', [
+            'customer_id' => $pelanggan->id,
+            'vehicle_id' => $kendaraan->id,
+            'checkup_date' => today()->toDateString(),
+            'results' => [['category' => 'Mesin', 'item_name' => 'Oli mesin', 'sort_order' => 1]],
+        ])->assertStatus(422)->assertJsonValidationErrors('results.0.status');
+    }
+
+    public function test_default_kolom_status_adalah_tidak_diperiksa(): void
+    {
+        // Default kolom DB juga "Tidak diperiksa" (bukan "OK") — jaring pengaman
+        // untuk baris yang dibuat tanpa status dari luar aplikasi.
+        $checkup = $this->buatCheckup();
+
+        $id = DB::table('checkup_results')->insertGetId([
+            'checkup_id' => $checkup->id,
+            'category' => 'Mesin',
+            'item_name' => 'Item tanpa status',
+            'sort_order' => 99,
+        ]);
+
+        $this->assertSame('tidak_diperiksa', DB::table('checkup_results')->where('id', $id)->value('status'));
+    }
+
+    public function test_duplikat_template_menyalin_semua_item_dan_nama_tidak_bertumpuk(): void
+    {
+        $asal = \App\Models\CheckupTemplate::query()->where('vehicle_type', 'motor')->with('items')->first();
+        $jumlahAsal = $asal->items->count();
+        $this->assertGreaterThan(20, $jumlahAsal);
+
+        // Peran kasir (akun bawaan setUp) TIDAK boleh menyalin template —
+        // mengubah template butuh izin setting.manage.
+        $this->postJson("/api/v1/checkup-templates/{$asal->id}/duplikat")->assertStatus(403);
+
+        $this->actingAs($this->buatPengguna('owner'), 'sanctum');
+        $res = $this->postJson("/api/v1/checkup-templates/{$asal->id}/duplikat")->assertStatus(201);
+        $idBaru = $res->json('data.id');
+
+        $salinan = \App\Models\CheckupTemplate::query()->with('items')->findOrFail($idBaru);
+        $this->assertSame($asal->vehicle_type, $salinan->vehicle_type);
+        $this->assertCount($jumlahAsal, $salinan->items, 'semua item ikut tersalin');
+        $this->assertSame(
+            $asal->items()->orderBy('sort_order')->pluck('name')->all(),
+            $salinan->items()->orderBy('sort_order')->pluck('name')->all(),
+            'urutan & nama item sama dengan sumber',
+        );
+
+        // Salinan kedua tidak boleh memakai nama yang sama.
+        $res2 = $this->postJson("/api/v1/checkup-templates/{$asal->id}/duplikat")->assertStatus(201);
+        $this->assertNotSame($res->json('data.name'), $res2->json('data.name'));
+        $this->assertStringContainsString('salinan', $res2->json('data.name'));
     }
 
     public function test_finish_checkup_only_tidak_membuat_form_sa(): void

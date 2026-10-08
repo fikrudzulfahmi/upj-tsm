@@ -176,6 +176,15 @@ jobs:
               fase "seeder peran & izin" $PHP_BIN artisan db:seed --class=RolePermissionSeeder --force
               fase "seeder pengaturan awal" $PHP_BIN artisan db:seed --class=SettingSeeder --force
               fase "seeder akun owner" $PHP_BIN artisan db:seed --class=OwnerUserSeeder --force
+
+              # Laporkan jumlah akun (bukan isinya) supaya jelas bila kredensial owner
+              # belum diisi di .env — tanpa itu tidak ada yang bisa login.
+              jumlah=$($PHP_BIN artisan tinker --execute="echo \App\Models\User::count();" 2>/dev/null | tail -1 | tr -d '[:space:]')
+              if [ "${jumlah:-0}" = "0" ]; then
+                echo "::warning title=TIDAK ADA AKUN::Seeder akun owner menghasilkan 0 pengguna. Isi OWNER_EMAIL dan OWNER_PASSWORD di .env server, lalu jalankan workflow ini lagi dengan mode fresh."
+              else
+                echo "::notice title=AKUN SIAP::Jumlah akun pengguna: ${jumlah}. Login memakai OWNER_EMAIL + OWNER_PASSWORD dari .env server."
+              fi
             else
               if ! $PHP_BIN artisan migrate --force >/tmp/migrasi.log 2>&1; then
                 ringkas=$(tail -c 400 /tmp/migrasi.log | tr '\n' ' ')

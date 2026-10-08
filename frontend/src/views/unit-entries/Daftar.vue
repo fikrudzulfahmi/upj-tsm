@@ -2,14 +2,21 @@
 import { onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { unitEntryApi } from '@/api'
+import { pesanGalat } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
 import { useDaftar } from '@/composables/useDaftar'
 import { formatRupiah, formatTanggal } from '@/utils/format'
 import { jenisUnit, statusSa } from '@/utils/status'
 import BaseTable from '@/components/ui/BaseTable.vue'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import BaseSelect from '@/components/ui/BaseSelect.vue'
 import BaseBadge from '@/components/ui/BaseBadge.vue'
 import Pagination from '@/components/ui/Pagination.vue'
+
+const auth = useAuthStore()
+const ui = useUiStore()
 
 const kolom = [
   { kunci: 'entry_no', label: 'No. Unit' },
@@ -19,11 +26,28 @@ const kolom = [
   { kunci: 'type', label: 'Tipe' },
   { kunci: 'dokumen', label: 'Dokumen' },
   { kunci: 'nilai', label: 'Nilai SA', align: 'kanan' },
+  { kunci: 'aksi', label: '', kelas: 'w-16 text-right' },
 ]
 
 const daftar = useDaftar((f) => unitEntryApi.daftar(f))
 
 onMounted(daftar.muat)
+
+async function hapus(baris) {
+  const ya = await ui.tanya({
+    judul: 'Hapus kunjungan',
+    pesan: `Hapus ${baris.entry_no}? Dokumen (check up / Form SA) yang menempel ikut dihapus.`,
+    teksOk: 'Hapus',
+  })
+  if (!ya) return
+  try {
+    await unitEntryApi.hapus(baris.id)
+    ui.sukses('Kunjungan dihapus.')
+    daftar.muat()
+  } catch (e) {
+    ui.gagal(pesanGalat(e))
+  }
+}
 </script>
 
 <template>
@@ -78,6 +102,18 @@ onMounted(daftar.muat)
       </template>
       <template #sel-nilai="{ baris }">
         <span class="tabular text-sm">{{ baris.grand_total ? formatRupiah(baris.grand_total) : '-' }}</span>
+      </template>
+      <template #sel-aksi="{ baris }">
+        <div class="flex justify-end">
+          <BaseButton
+            v-if="auth.isAdmin"
+            ukuran="ikon"
+            varian="bahaya"
+            ikon="trash"
+            title="Hapus"
+            @click="hapus(baris)"
+          />
+        </div>
       </template>
     </BaseTable>
 

@@ -192,6 +192,7 @@ export const saApi = {
 
 export const unitEntryApi = {
   daftar: (params) => ambil('/unit-entries', params),
+  hapus: (id) => hapus(`/unit-entries/${id}`),
 }
 
 /* ---------------------------------- kasir --------------------------------- */

@@ -159,6 +159,7 @@ Route::middleware(['auth:sanctum', 'aktif'])->group(function () {
         Route::delete('/service-orders/{serviceOrder}', [ServiceOrderController::class, 'destroy'])->middleware('role:owner|admin');
 
         Route::get('/unit-entries', [UnitEntryController::class, 'index']);
+        Route::delete('/unit-entries/{unitEntry}', [UnitEntryController::class, 'destroy'])->middleware('role:owner|admin');
     });
 
     /* ---------------------------------------------------------------- KASIR --- */

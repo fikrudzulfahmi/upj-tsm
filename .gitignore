@@ -1,0 +1,31 @@
+# Root .gitignore — monorepo bengkel-app
+# (backend/ punya .gitignore Laravel sendiri, frontend/ punya .gitignore Node sendiri)
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# Rahasia & data lokal
+.env
+*.env.local
+!*.env.example
+
+# Berkas sementara
+*.bak
+*.tmp
+.phpunit.result.cache
+.phpunit.cache/
+
+# Backup & dump database
+*.sql
+!database/*.sql
+
+# Keluaran skrip uji asap lokal
+backend/tools/.smoke-out.json
+
+# Catatan nilai deploy (berisi domain asli — repo ini publik)
+CATATAN-LOKAL.md

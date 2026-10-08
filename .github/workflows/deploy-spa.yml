@@ -1,0 +1,99 @@
+# Deploy SPA (Vue + Vite) ke subdomain utama — monorepo: HANYA berjalan bila frontend/ berubah.
+#
+# PENTING: VITE_API_URL tertanam saat BUILD. Diisi dari secret, bukan .env lokal —
+# kalau tidak, aplikasi produksi akan menembak http://127.0.0.1.
+name: Deploy SPA (Vue)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-spa.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-spa
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Periksa secrets wajib
+        run: |
+          gagal=0
+          for s in SSH_HOST SSH_USER SSH_KEY DEPLOY_PATH_SPA VITE_API_URL; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s belum diisi di Settings → Secrets and variables → Actions"; gagal=1; fi
+          done
+          exit $gagal
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_PATH_SPA: ${{ secrets.DEPLOY_PATH_SPA }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_APP_NAME: ${{ secrets.VITE_APP_NAME }}
+        run: |
+          set -e
+          npm ci
+          npm run build
+          echo "== isi dist (pastikan .htaccess ada) =="
+          ls -a dist
+          if [ ! -f dist/.htaccess ]; then
+            echo "::error::dist/.htaccess hilang — tanpa berkas itu halaman seperti /kasir akan 404 saat di-refresh."
+            exit 1
+          fi
+
+      - name: Unggah dist ke document root SPA
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          # Seluruh DIREKTORI dist diunggah (bukan dist/*) supaya berkas titik seperti
+          # .htaccess ikut. strip_components: 2 membuang "frontend/dist" dari tiap entri.
+          source: 'frontend/dist'
+          target: ${{ secrets.DEPLOY_PATH_SPA }}
+          strip_components: 2
+          overwrite: true
+
+      - name: Cek SPA hidup (bila APP_URL diisi)
+        # `secrets` tidak boleh dipakai langsung di `if` → dialirkan lewat env.
+        if: env.APP_URL != ''
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          set -e
+          kode=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$APP_URL/login" || true)
+          echo "HTTP $kode dari $APP_URL/login"
+          if [ "$kode" != "200" ]; then
+            echo "::error::SPA menjawab HTTP $kode. Pastikan document root subdomain berisi isi dist/ (index.html + .htaccess)."
+            exit 1
+          fi
+
+          # Tautan dalam (deep link) hanya 200 bila .htaccess SPA benar-benar terpasang.
+          # Ini uji paling murah untuk masalah "404 saat halaman di-refresh".
+          dalam=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$APP_URL/kasir" || true)
+          echo "HTTP $dalam dari $APP_URL/kasir (tautan dalam)"
+          if [ "$dalam" != "200" ]; then
+            echo "::error::Tautan dalam mengembalikan HTTP $dalam — berkas .htaccess kemungkinan TIDAK terunggah ke document root SPA. Unggah ulang isi dist/ termasuk berkas tersembunyi itu."
+            exit 1
+          fi
+
+          echo "::notice::SPA sehat: beranda & tautan dalam sama-sama HTTP 200 (rewrite SPA aktif)."

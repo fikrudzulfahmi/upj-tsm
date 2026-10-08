@@ -1,0 +1,110 @@
+# Deploy API (Laravel) ke subdomain api-…  — monorepo: HANYA berjalan bila backend/ berubah.
+#
+# Alur: push ke main (atau tombol "Run workflow") → SSH ke cPanel → git pull → composer
+# → migrate → cache. Semua kegagalan ditulis sebagai ::error:: agar terbaca di tab
+# "Annotations" (tampilan Actions yang paling mudah dilihat).
+name: Deploy API (Laravel)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      PHP_BIN: ${{ secrets.PHP_BIN }}
+      DEPLOY_PATH_API: ${{ secrets.DEPLOY_PATH_API }}
+
+    steps:
+      - name: Periksa secrets wajib
+        run: |
+          gagal=0
+          for s in SSH_HOST SSH_USER SSH_KEY DEPLOY_PATH_API; do
+            if [ -z "${!s}" ]; then echo "::error::Secret $s belum diisi di Settings → Secrets and variables → Actions"; gagal=1; fi
+          done
+          exit $gagal
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          DEPLOY_PATH_API: ${{ secrets.DEPLOY_PATH_API }}
+
+      - name: Deploy lewat SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script_stop: true
+          envs: PHP_BIN,DEPLOY_PATH_API
+          script: |
+            set -e
+            PHP_BIN="${PHP_BIN:-php}"
+
+            # PHP versi berapa yang dipakai? Berguna saat ada kegagalan.
+            echo "PHP  : $($PHP_BIN -v | head -1)"
+            echo "PATH : $DEPLOY_PATH_API"
+
+            cd "$DEPLOY_PATH_API"
+
+            # Composer: pakai binary bila ada, kalau tidak pakai composer.phar di home.
+            if command -v composer >/dev/null 2>&1; then
+              COMPOSER="composer"
+            elif [ -f "$HOME/composer.phar" ]; then
+              COMPOSER="$PHP_BIN $HOME/composer.phar"
+            else
+              echo "::error::composer tidak ditemukan di server. Pasang lewat cPanel (Setup → Composer) atau unggah composer.phar ke home."
+              exit 1
+            fi
+
+            echo "== ambil kode terbaru =="
+            git pull --ff-only origin main
+
+            echo "== dependensi produksi =="
+            $COMPOSER install --no-dev --optimize-autoloader --no-interaction
+
+            echo "== migrasi database =="
+            $PHP_BIN artisan migrate --force
+
+            echo "== simpan tautan storage =="
+            $PHP_BIN artisan storage:link || true
+
+            echo "== cache produksi (clear dulu, kalau tidak nilai .env lama bisa tertahan) =="
+            $PHP_BIN artisan config:clear
+            $PHP_BIN artisan route:clear
+            $PHP_BIN artisan view:clear
+            $PHP_BIN artisan event:clear
+            $PHP_BIN artisan config:cache
+            $PHP_BIN artisan route:cache
+            $PHP_BIN artisan view:cache
+            $PHP_BIN artisan event:cache
+
+            echo "== ringkasan =="
+            $PHP_BIN artisan --version
+            $PHP_BIN artisan migrate:status | tail -5
+
+      - name: Cek API hidup (bila API_URL diisi)
+        # Catatan: konteks `secrets` TIDAK boleh dipakai di `if` (GitHub Actions menolaknya),
+        # jadi nilainya dialirkan lewat env lebih dulu.
+        if: env.API_URL != ''
+        env:
+          API_URL: ${{ secrets.API_URL }}
+        run: |
+          set -e
+          kode=$(curl -s -o /dev/null -w '%{http_code}' -m 20 "$API_URL/ping" || true)
+          echo "HTTP $kode dari $API_URL/ping"
+          if [ "$kode" != "200" ]; then
+            echo "::error::API menjawab HTTP $kode. Cek: docroot subdomain harus menunjuk ke backend/public, lalu lihat storage/logs/laravel.log di server."
+            exit 1
+          fi
+          echo "::notice::API sehat (HTTP 200)."

@@ -29,3 +29,6 @@ backend/tools/.smoke-out.json
 
 # Catatan nilai deploy (berisi domain asli — repo ini publik)
 CATATAN-LOKAL.md
+
+# snapshot lokal (Hermes)
+backup/
